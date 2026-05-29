@@ -1,0 +1,6 @@
+Mi serve uno script in bash per linux che controlli se un IP cade e lo segnali suonando ping.mp3 una volta file che ho già e si trova a fianco dello script
+- si deve inserire l IP all'avvio dello script, se non indicato viene chiesto
+- all avvio dello script ping.mp3 viene suonato per test
+- il tempo di default del controllo è 20 secondi, ma è la seconda richiesta all'avvio del programma in caso si voglia cambiare
+- se lP torna online ping.mp3 viene suonato una volta
+- per suonare ping.mp3 viene usato un programma installato che può farlo tra i tanti comuni in linux, tra cui mpv e vlc possibilmente senza aprire l'interfaccia 

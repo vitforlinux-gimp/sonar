@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Script di monitoraggio IP con notifica audio
+# By Foresko Company - Sky
+
+# Funzione per suonare il file audio
+play_audio() {
+    local audio_file="$(dirname "$0")/ping.mp3"
+    
+    if command -v mpv &> /dev/null; then
+        mpv --no-terminal "$audio_file" &> /dev/null &
+    elif command -v vlc &> /dev/null; then
+        vlc --play-and-exit --no-video "$audio_file" &> /dev/null &
+    elif command -v ffplay &> /dev/null; then
+        ffplay -nodisp -autoexit "$audio_file" &> /dev/null &
+    elif command -v aplay &> /dev/null; then
+        aplay "$audio_file" &> /dev/null &
+    else
+        echo "ERRORE: Nessun riproduttore audio trovato!"
+        echo "Installa mpv, vlc, ffmpeg o aplay"
+        exit 1
+    fi
+    
+    # Aspetta che il suono finisca
+    sleep 1
+}
+
+# Richiedi l'indirizzo IP
+if [ -z "$1" ]; then
+    read -p "Inserisci l'indirizzo IP da monitorare: " TARGET_IP
+else
+    TARGET_IP="$1"
+fi
+
+# Validazione IP
+if ! [[ $TARGET_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo "ERRORE: Formato IP non valido!"
+    echo "Esempio: 192.168.1.1"
+    exit 1
+fi
+
+# Richiedi il tempo di controllo
+read -p "Inserisci l'intervallo di controllo in secondi (default 20): " CHECK_INTERVAL
+CHECK_INTERVAL=${CHECK_INTERVAL:-20}
+
+# Test del suono all'avvio
+echo "Test suono ping.mp3..."
+play_audio
+
+# Variabili di stato
+PREVIOUS_STATUS="offline"
+FIRST_CHECK=true
+
+echo "================================================"
+echo "Monitoraggio IP: $TARGET_IP"
+echo "Intervallo di controllo: $CHECK_INTERVAL secondi"
+echo "Premi CTRL+C per interrompere"
+echo "================================================"
+
+# Loop di monitoraggio
+while true; do
+    # Esegui il ping (1 pacchetto, timeout di 5 secondi)
+    if ping -c 1 -W 5 "$TARGET_IP" &> /dev/null; then
+        CURRENT_STATUS="online"
+    else
+        CURRENT_STATUS="offline"
+    fi
+    
+    # Mostra lo stato corrente con timestamp
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $TARGET_IP è $CURRENT_STATUS"
+    
+    # Controlla se lo stato è cambiato
+    if [ "$CURRENT_STATUS" != "$PREVIOUS_STATUS" ] && [ "$FIRST_CHECK" = false ]; then
+        echo "STATO CAMBIATO: $TARGET_IP ora è $CURRENT_STATUS!"
+        play_audio
+    fi
+    
+    # Aggiorna lo stato precedente
+    PREVIOUS_STATUS="$CURRENT_STATUS"
+    FIRST_CHECK=false
+    
+    # Aspetta prima del prossimo controllo
+    sleep "$CHECK_INTERVAL"
+done

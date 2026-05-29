@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+# monitor_ip.sh
+# Controlla se un IP cade e suona ping.mp3 all'avvio, alla perdita e al ritorno online.
+
+PLAY_FILE="./ping.mp3"
+
+# Funzione per riprodurre file con mpv o vlc (senza interfaccia)
+play_sound() {
+  if command -v mpv >/dev/null 2>&1; then
+    mpv --no-terminal --really-quiet --loop=no "$PLAY_FILE" >/dev/null 2>&1 &
+  elif command -v vlc >/dev/null 2>&1; then
+    # --intf dummy evita interfaccia; --play-and-exit per terminare
+    cvlc --play-and-exit --quiet "$PLAY_FILE" >/dev/null 2>&1 &
+  else
+    echo "Nessun lettore mpv/vlc trovato. Impossibile riprodurre $PLAY_FILE" >&2
+  fi
+}
+
+# Ottieni IP da argomento o chiedi
+if [ -n "$1" ]; then
+  TARGET="$1"
+else
+  read -rp "Inserisci IP o hostname da monitorare: " TARGET
+fi
+
+# Chiedi intervallo (default 20s)
+read -rp "Intervallo di controllo in secondi [20]: " INTERV
+INTERV=${INTERV:-20}
+
+# Controlli base
+if [ ! -f "$PLAY_FILE" ]; then
+  echo "File $PLAY_FILE non trovato nella stessa cartella dello script." >&2
+  exit 1
+fi
+
+echo "Monitoraggio $TARGET ogni $INTERV secondi. Premi Ctrl+C per terminare."
+
+# Suona all'avvio per test
+play_sound
+
+# Stato iniziale: proviamo un ping
+is_up() {
+  # invia 1 pacchetto con timeout 3s (modificabile)
+  if ping -c 1 -W 3 "$TARGET" >/dev/null 2>&1; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+prev_state=unknown
+if is_up; then prev_state=up; else prev_state=down; fi
+
+# Loop di monitoraggio
+while true; do
+  sleep "$INTERV"
+  if is_up; then
+    if [ "$prev_state" != "up" ]; then
+      echo "$(date +'%F %T') - $TARGET è tornato ONLINE"
+      play_sound
+      prev_state=up
+    fi
+  else
+    if [ "$prev_state" != "down" ]; then
+      echo "$(date +'%F %T') - $TARGET è OFFLINE"
+      play_sound
+      prev_state=down
+    fi
+  fi
+done
